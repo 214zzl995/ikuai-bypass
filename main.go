@@ -92,10 +92,77 @@ func readConf(filename string) error {
 	return nil
 }
 
+func checkURLsConnectivity() bool {
+	// 收集所有需要检测的 URL
+	urls := collectURLsFromConfig()
+	allConnected := true
+
+	for _, url := range urls {
+		if !checkURL(url) {
+			log.Printf("URL 不可达：%s\n", url)
+			allConnected = false
+		} else {
+			log.Printf("URL 可达：%s\n", url)
+		}
+	}
+
+	return allConnected
+}
+
+// 从配置文件中收集所有 URL
+func collectURLsFromConfig() []string {
+	var urls []string
+
+	// 收集 CustomIsp 中的 URL
+	for _, customIsp := range conf.CustomIsp {
+		urls = append(urls, customIsp.URL)
+	}
+
+	// 收集 IpGroup 中的 URL
+	for _, ipGroup := range conf.IpGroup {
+		urls = append(urls, ipGroup.URL)
+	}
+
+	// 收集 StreamDomain 中的 URL
+	for _, streamDomain := range conf.StreamDomain {
+		urls = append(urls, streamDomain.URL)
+	}
+
+	return urls
+}
+
+// 检查单个 URL 的连通性
+func checkURL(url string) bool {
+	resp, err := http.Head(url)
+	if err != nil {
+		log.Printf("无法访问 URL: %s，错误: %v\n", url, err)
+		return false
+	}
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+
+		}
+	}(resp.Body)
+
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("URL 返回状态码异常：%s，状态码：%d\n", url, resp.StatusCode)
+		return false
+	}
+
+	return true
+}
+
 func update() {
 	err := readConf(*confPath)
 	if err != nil {
 		log.Println("更新配置文件失败：", err)
+		return
+	}
+
+	// 检查配置文件中所有 URL 的连通性
+	if !checkURLsConnectivity() {
+		log.Println("网络连通性检测失败，请检查配置文件中的 URL 或网络连接。")
 		return
 	}
 
